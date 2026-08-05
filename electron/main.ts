@@ -1,11 +1,24 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
-import { getInstalledPrinters, printLabel } from './printer';
-import { initDatabase, getPrintRecords } from './database';
+import * as fs from 'fs';
+import { getInstalledPrinters, printLabel, checkPrinterStatus } from './printer';
+import {
+  initDatabase,
+  getPrintRecords,
+  getTemplates,
+  saveTemplate,
+  deleteTemplate,
+  getSettings,
+  saveSettings,
+  exportPrintLogsCSV
+} from './database';
 
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
+  const preloadPath = path.join(__dirname, 'preload.js');
+  console.log('Initializing BrowserWindow with preload:', preloadPath);
+
   mainWindow = new BrowserWindow({
     width: 1380,
     height: 860,
@@ -15,9 +28,9 @@ function createWindow() {
     icon: path.join(__dirname, '../public/logo.jpeg'),
     autoHideMenuBar: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
+      preload: preloadPath,
       contextIsolation: true,
+      nodeIntegration: false,
       sandbox: false
     },
     backgroundColor: '#0B1B3A'
@@ -41,9 +54,7 @@ function createWindow() {
   });
 }
 
-
 app.whenReady().then(async () => {
-  // Initialize local SQLite DB
   try {
     await initDatabase();
     console.log('Local SQLite Database Initialized');
@@ -72,13 +83,80 @@ ipcMain.handle('get-printers', async () => {
   return await getInstalledPrinters(mainWindow);
 });
 
-// IPC Handler: Execute Thermal Print Request & Save SQLite
+// IPC Handler: Check Thermal Printer Live Status
+ipcMain.handle('check-printer-status', async (_, printerName?: string) => {
+  if (!mainWindow) return { status: 'offline', printerName: printerName || '' };
+  return await checkPrinterStatus(mainWindow, printerName);
+});
+
+// IPC Handler: Execute Thermal Print Request & Save to SQLite on Success Only
 ipcMain.handle('print-label', async (_, request) => {
   if (!mainWindow) return { success: false, message: 'Window not active' };
   return await printLabel(mainWindow, request);
 });
 
 // IPC Handler: Fetch SQLite Print History
-ipcMain.handle('get-print-history', async (_, limit?: number) => {
-  return await getPrintRecords(limit || 50);
+ipcMain.handle('get-print-history', async (_, filters?: { search?: string; limit?: number }) => {
+  const search = typeof filters === 'string' ? filters : filters?.search;
+  const limit = filters?.limit || 100;
+  return await getPrintRecords(search, limit);
+});
+
+// IPC Handler: Fetch Product Templates
+ipcMain.handle('get-templates', async () => {
+  return await getTemplates();
+});
+
+// IPC Handler: Save or Update Product Template
+ipcMain.handle('save-template', async (_, template) => {
+  return await saveTemplate(template);
+});
+
+// IPC Handler: Delete Product Template
+ipcMain.handle('delete-template', async (_, id: number) => {
+  return await deleteTemplate(id);
+});
+
+// IPC Handler: Fetch App Settings
+ipcMain.handle('get-settings', async () => {
+  return await getSettings();
+});
+
+// IPC Handler: Save App Settings
+ipcMain.handle('save-settings', async (_, settingsMap) => {
+  return await saveSettings(settingsMap);
+});
+
+// IPC Handler: Export Print Log CSV Report with Save File Dialog
+ipcMain.handle('export-report', async (_event, options: { range: 'today' | '7days' | '30days' | 'custom'; startDate?: string; endDate?: string }) => {
+  if (!mainWindow) return { success: false, message: 'Window not active' };
+
+  const range = options?.range || 'today';
+  const startDate = options?.startDate;
+  const endDate = options?.endDate;
+
+  const csvContent = await exportPrintLogsCSV(range, startDate, endDate);
+  if (!csvContent) {
+    return { success: false, message: 'No print history records found for the selected range.' };
+  }
+
+  const defaultFilename = `Matadin_Print_Report_${range}_${Date.now()}.csv`;
+  const defaultDir = app.getPath('downloads') || app.getPath('documents');
+
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save Print Log Report (CSV)',
+    defaultPath: path.join(defaultDir, defaultFilename),
+    filters: [{ name: 'CSV Files (*.csv)', extensions: ['csv'] }]
+  });
+
+  if (canceled || !filePath) {
+    return { success: false, message: 'Export canceled' };
+  }
+
+  try {
+    fs.writeFileSync(filePath, csvContent, 'utf8');
+    return { success: true, message: `Report exported to ${path.basename(filePath)}`, filePath };
+  } catch (err: any) {
+    return { success: false, message: `Failed to save CSV file: ${err.message}` };
+  }
 });

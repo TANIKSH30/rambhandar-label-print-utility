@@ -1,5 +1,5 @@
 import React from 'react';
-import { PrinterLanguage, PrinterDevice } from '../types/label';
+import { PrinterLanguage, PrinterDevice, PrinterStatusType } from '../types/label';
 import { Printer, RefreshCw, RotateCcw, Minus, Plus, Cpu, CheckCircle2, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 
 interface PrintSetupBarProps {
@@ -15,12 +15,9 @@ interface PrintSetupBarProps {
   onPrint: () => void;
   isPrinting: boolean;
   printStatus: { type: 'idle' | 'success' | 'error'; message: string } | null;
+  printerStatus: PrinterStatusType;
+  printProgress?: { current: number; total: number } | null;
 }
-
-const isThermalPrinter = (name: string): boolean => {
-  if (!name) return false;
-  return /zebra|honeywell|intermec|toshiba|tsc|datamax|sato|bixolon|thermal|zpl|godex/i.test(name);
-};
 
 export const PrintSetupBar: React.FC<PrintSetupBarProps> = ({
   copies,
@@ -34,43 +31,61 @@ export const PrintSetupBar: React.FC<PrintSetupBarProps> = ({
   onResetForm,
   onPrint,
   isPrinting,
-  printStatus
+  printStatus,
+  printerStatus,
+  printProgress
 }) => {
-  const isThermalConnected = printers.some(p => isThermalPrinter(p.name)) || isThermalPrinter(selectedPrinter);
+  const isPrinterOffline = printerStatus === 'offline';
+
+  const handleCopiesInput = (val: string) => {
+    const parsed = parseInt(val, 10);
+    if (isNaN(parsed)) {
+      onCopiesChange(1);
+    } else {
+      onCopiesChange(Math.max(1, Math.min(999, parsed)));
+    }
+  };
 
   return (
-    <div className="bg-white/95 backdrop-blur-md border-t border-slate-200/80 p-4 shadow-lg select-none">
+    <div className="bg-white/95 backdrop-blur-md border-t border-slate-200/80 p-4 shadow-lg select-none shrink-0">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         
-        {/* Left Controls: Copies, Language, Printer */}
+        {/* Left Controls: Copies (1-999), Language, Target Printer */}
         <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
           
-          {/* Copies Selector */}
+          {/* Advanced Copies Selector (1-999) */}
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Copies</label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Copies (1-999)</label>
             <div className="flex items-center bg-slate-100/80 rounded-xl p-1 border border-slate-300/80">
               <button
                 type="button"
                 onClick={() => onCopiesChange(Math.max(1, copies - 1))}
                 className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-700 hover:bg-slate-200 transition active:scale-95 disabled:opacity-50"
-                disabled={copies <= 1}
+                disabled={copies <= 1 || isPrinting}
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="w-10 text-center font-bold text-sm text-[#0B1B3A]">
-                {copies}
-              </span>
+              <input
+                type="number"
+                min="1"
+                max="999"
+                value={copies}
+                onChange={(e) => handleCopiesInput(e.target.value)}
+                disabled={isPrinting}
+                className="w-12 text-center font-bold text-sm text-[#0B1B3A] bg-transparent border-none focus:outline-none"
+              />
               <button
                 type="button"
-                onClick={() => onCopiesChange(copies + 1)}
-                className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-700 hover:bg-slate-200 transition active:scale-95"
+                onClick={() => onCopiesChange(Math.min(999, copies + 1))}
+                className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-700 hover:bg-slate-200 transition active:scale-95 disabled:opacity-50"
+                disabled={copies >= 999 || isPrinting}
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* Printer Language Dropdown */}
+          {/* Command Language Dropdown */}
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
               <Cpu className="w-3 h-3 text-slate-400" /> Command Language
@@ -78,23 +93,25 @@ export const PrintSetupBar: React.FC<PrintSetupBarProps> = ({
             <select
               value={language}
               onChange={(e) => onLanguageChange(e.target.value as PrinterLanguage)}
+              disabled={isPrinting}
               className="px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#0B1B3A]/20 focus:border-[#0B1B3A] h-[40px] min-w-[170px] transition-all"
             >
-              <option value="Zebra ZPL II">Zebra ZPL II</option>
+              <option value="Zebra ZPL II">Zebra ZPL II (^PQ Optimized)</option>
               <option value="Honeywell Fingerprint">Honeywell Fingerprint</option>
               <option value="Toshiba TPCL">Toshiba TPCL</option>
             </select>
           </div>
 
-          {/* Installed Printer Dropdown + Refresh */}
+          {/* Target Printer Dropdown */}
           <div className="flex flex-col gap-1 flex-1 min-w-[220px]">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-              <Printer className="w-3 h-3 text-slate-400" /> Target Printer
+              <Printer className="w-3 h-3 text-slate-400" /> Target Thermal Printer
             </label>
             <div className="flex items-center gap-1.5">
               <select
                 value={selectedPrinter}
                 onChange={(e) => onPrinterSelect(e.target.value)}
+                disabled={isPrinting}
                 className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#0B1B3A]/20 focus:border-[#0B1B3A] h-[40px] transition-all"
               >
                 {printers.length > 0 ? (
@@ -112,7 +129,8 @@ export const PrintSetupBar: React.FC<PrintSetupBarProps> = ({
                 type="button"
                 onClick={onRefreshPrinters}
                 title="Refresh Printer List"
-                className="h-[40px] w-[40px] shrink-0 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl flex items-center justify-center text-slate-700 transition active:scale-95"
+                disabled={isPrinting}
+                className="h-[40px] w-[40px] shrink-0 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl flex items-center justify-center text-slate-700 transition active:scale-95 disabled:opacity-50"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
@@ -123,28 +141,36 @@ export const PrintSetupBar: React.FC<PrintSetupBarProps> = ({
         {/* Right Controls: Connection Status, Feedback, Reset & Print Button */}
         <div className="flex items-center gap-3 w-full md:w-auto justify-end">
           
-          {/* Requirement 7: Green Printer Connected vs Yellow Thermal Printer Not Connected */}
+          {/* Live Printer Connection Indicator */}
           <div className="hidden sm:flex items-center">
-            {isThermalConnected ? (
+            {!isPrinterOffline ? (
               <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 text-emerald-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Printer Connected</span>
+                <span>Printer Ready</span>
               </div>
             ) : (
-              <div className="px-3 py-1.5 bg-amber-50 border border-amber-200/80 text-amber-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-                <WifiOff className="w-3.5 h-3.5 text-amber-600" />
-                <span>Thermal Printer Not Connected</span>
+              <div className="px-3 py-1.5 bg-red-50 border border-red-200/80 text-red-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+                <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                <WifiOff className="w-3.5 h-3.5 text-red-600" />
+                <span>Printer Offline</span>
               </div>
             )}
           </div>
 
-          {/* Print Status Feedback */}
-          {printStatus && (
+          {/* Live Dispatch Progress Counter */}
+          {isPrinting && printProgress && (
+            <div className="px-3.5 py-1.5 bg-amber-500 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-md animate-pulse">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>Printing {printProgress.current} / {printProgress.total}</span>
+            </div>
+          )}
+
+          {/* Print Status Feedback Toast */}
+          {printStatus && !isPrinting && (
             <div className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 animate-fade-in ${
               printStatus.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-sm' :
               printStatus.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200 shadow-sm' : 'text-slate-500'
@@ -159,21 +185,30 @@ export const PrintSetupBar: React.FC<PrintSetupBarProps> = ({
           <button
             type="button"
             onClick={onResetForm}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl transition-all duration-150 flex items-center gap-2 h-[42px] active:scale-95"
+            disabled={isPrinting}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl transition-all duration-150 flex items-center gap-2 h-[42px] active:scale-95 disabled:opacity-50"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-500" /> Reset
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" /> Reset (Ctrl+R)
           </button>
 
           {/* Primary Amber Print Button (#F59E0B) */}
           <button
             type="button"
             onClick={onPrint}
-            disabled={isPrinting}
+            disabled={isPrinting || isPrinterOffline}
+            title={isPrinterOffline ? 'Thermal printer is offline or disconnected' : 'Print Labels (Ctrl+P)'}
             className="px-8 py-2.5 bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 font-black text-sm rounded-xl shadow-md hover:shadow-lg transition-all duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2.5 h-[42px] tracking-wide"
           >
             <Printer className="w-5 h-5 text-slate-950" />
-            <span>{isPrinting ? 'PRINTING...' : 'PRINT LABELS'}</span>
+            <span>
+              {isPrinting
+                ? `PRINTING ${copies > 1 ? `(${copies})` : ''}...`
+                : isPrinterOffline
+                ? 'PRINTER OFFLINE'
+                : 'PRINT LABELS'}
+            </span>
           </button>
+
         </div>
 
       </div>

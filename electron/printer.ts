@@ -1,6 +1,6 @@
 import { BrowserWindow, PrinterInfo } from 'electron';
 import { generateZPL, generateFingerprint, generateTPCL, LabelData } from './zplGenerator';
-import { savePrintRecord } from './database';
+import { savePrintRecordOnlyOnSuccess } from './database';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -25,6 +25,49 @@ export async function getInstalledPrinters(window: BrowserWindow): Promise<Print
   } catch (error) {
     console.error('Failed to get system printers:', error);
     return [];
+  }
+}
+
+/**
+ * Check live printer status (ready, busy, offline)
+ */
+export async function checkPrinterStatus(
+  window: BrowserWindow,
+  printerName?: string
+): Promise<{ status: 'ready' | 'busy' | 'offline'; printerName: string }> {
+  try {
+    const installed = await getInstalledPrinters(window);
+    if (!installed || installed.length === 0) {
+      return { status: 'offline', printerName: printerName || 'No Printers Installed' };
+    }
+
+    let target = installed.find(p => p.name === printerName);
+    if (!target) {
+      // Fallback to thermal or default printer
+      target = installed.find(p => THERMAL_PRINTER_REGEX.test(p.name)) || installed.find(p => p.isDefault) || installed[0];
+    }
+
+    if (!target) {
+      return { status: 'offline', printerName: printerName || 'No Printer Found' };
+    }
+
+    // Windows status check: status 0 or 256 is typically Ready.
+    // Check status flags or status string
+    const statusVal = target.status;
+    let computedStatus: 'ready' | 'busy' | 'offline' = 'ready';
+
+    if (statusVal === 3 || statusVal === 4 || statusVal === 5 || statusVal === 7) {
+      computedStatus = 'offline';
+    } else if (statusVal === 1 || statusVal === 2) {
+      computedStatus = 'busy';
+    }
+
+    return {
+      status: computedStatus,
+      printerName: target.name
+    };
+  } catch (err) {
+    return { status: 'offline', printerName: printerName || 'Error' };
   }
 }
 
@@ -152,12 +195,7 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
       return { success: false, message: 'Thermal printer not connected.' };
     }
 
-    // 2. Save print job to SQLite DB asynchronously
-    savePrintRecord(labelData, copies, targetPrinterName, language).catch(err => {
-      console.warn('SQLite log notice:', err);
-    });
-
-    // 3. Generate RAW ZPL / Fingerprint / TPCL command
+    // 2. Generate RAW ZPL / Fingerprint / TPCL command using ^PQ for multi-copy single job optimization
     let rawCommand = '';
     if (language === 'Honeywell Fingerprint') {
       rawCommand = generateFingerprint(labelData, copies);
@@ -167,10 +205,15 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
       rawCommand = generateZPL(labelData, copies);
     }
 
-    // 4. Send RAW bytes directly to printer via Win32 WritePrinter API
+    // 3. Send RAW bytes directly to printer via Win32 WritePrinter API
     const isSuccess = await sendRawToWindowsPrinter(targetPrinterName, rawCommand);
 
     if (isSuccess) {
+      // SAVE TO SQLITE HISTORY ONLY IF PRINT JOB WAS ACCEPTED BY PRINTER
+      savePrintRecordOnlyOnSuccess(labelData, copies, targetPrinterName, language, 'SUCCESS').catch(err => {
+        console.warn('SQLite print history log notice:', err);
+      });
+
       return {
         success: true,
         message: `Label Printed Successfully (${copies} cop${copies > 1 ? 'ies' : 'y'})`
@@ -178,7 +221,7 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
     } else {
       return {
         success: false,
-        message: 'Thermal printer not connected.'
+        message: 'Thermal printer not connected or printer error.'
       };
     }
 
@@ -186,10 +229,7 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
     console.error('Thermal Print Engine Error:', error);
     return {
       success: false,
-      message: 'Thermal printer not connected.'
+      message: 'Thermal printer error occurred.'
     };
   }
 }
-
-
-
