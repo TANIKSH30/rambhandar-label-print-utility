@@ -85,10 +85,11 @@ export const App: React.FC = () => {
           setPrintStatus({ type: 'error', message: response.message || 'Printer offline or not found.' });
         }
       } else {
-        // Fallback for preview mode
+        // Fallback for browser preview mode
+        window.print();
         setPrintStatus({ 
           type: 'success', 
-          message: 'Label Printed Successfully' 
+          message: 'Print Dialog Opened' 
         });
       }
     } catch (error: any) {
