@@ -80,9 +80,9 @@ export const App: React.FC = () => {
         });
 
         if (response.success) {
-          setPrintStatus({ type: 'success', message: 'Label Printed Successfully' });
+          setPrintStatus({ type: 'success', message: response.message || 'Label Printed Successfully' });
         } else {
-          setPrintStatus({ type: 'error', message: response.message || 'Printer offline or not found.' });
+          setPrintStatus({ type: 'error', message: response.message || 'Thermal printer not connected.' });
         }
       } else {
         // Fallback for browser preview mode
