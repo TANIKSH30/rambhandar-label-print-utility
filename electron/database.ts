@@ -54,7 +54,20 @@ export async function initDatabase(): Promise<Database | null> {
     const userDataPath = app.getPath('userData');
     dbFilePath = path.join(userDataPath, 'matadin_labels.sqlite');
 
-    const SQL = await initSqlJs();
+    const locateFile = (file: string) => {
+      const pathsToTry = [
+        path.join(__dirname, file),
+        path.join(__dirname, '../node_modules/sql.js/dist', file),
+        path.join(app.getAppPath(), 'node_modules/sql.js/dist', file),
+        path.join(process.resourcesPath || '', 'app.asar.unpacked/node_modules/sql.js/dist', file)
+      ];
+      for (const p of pathsToTry) {
+        if (fs.existsSync(p)) return p;
+      }
+      return file;
+    };
+
+    const SQL = await initSqlJs({ locateFile });
 
     if (fs.existsSync(dbFilePath)) {
       const fileBuffer = fs.readFileSync(dbFilePath);

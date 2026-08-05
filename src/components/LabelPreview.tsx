@@ -105,11 +105,11 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
 ^A0B,34,24^FDPACKED DATE: ${data.packedDate || '30 - 09 - 2026'}^FS
 ^FT441,368
 ^A0B,34,24^FDBEST BEFORE : ${data.bestBefore || '15 - 12 - 2026'}^FS
-^FO455,110
+^FO462,115
 ^BY4
 ^BCB,62,N,N
 ^FD>;1${data.barcodeNumber || '12345678'}^FS
-^FT549,355
+^FT556,335
 ^A0B,34,46^FD${data.barcodeNumber || '12345678'}^FS
 ^PQ1,0,1,Y
 ^XZ`;

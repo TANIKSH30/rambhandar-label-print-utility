@@ -6,12 +6,13 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && tsc -p tsconfig.electron.json && vite build --config vite.config.electron.ts",
+    "copy:wasm": "node -e \"require('fs').mkdirSync('dist-electron', { recursive: true }); require('fs').copyFileSync('node_modules/sql.js/dist/sql-wasm.wasm', 'dist-electron/sql-wasm.wasm')\"",
+    "build": "tsc && vite build && tsc -p tsconfig.electron.json && vite build --config vite.config.electron.ts && npm run copy:wasm",
     "vercel-build": "vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"vite\" \"npm:electron:start\"",
     "electron:start": "wait-on tcp:5173 && electron .",
-    "electron:build": "tsc && vite build && tsc -p tsconfig.electron.json",
+    "electron:build": "npm run build",
     "dist": "npm run electron:build && electron-builder --win dir"
   },
   "dependencies": {
@@ -22,7 +23,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sql.js": "^1.14.1",
-    "tailwind-merge": "^3.0.1"
+    "tailwind-merge": "^3.0.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bwip-js": "^3.2.3",
@@ -52,9 +54,19 @@
       "dist-electron/**/*"
     ],
     "win": {
-      "target": "dir",
+      "target": [
+        "nsis",
+        "portable",
+        "dir"
+      ],
       "forceCodeSigning": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Label Print Utility"
     }
   }
 }
-

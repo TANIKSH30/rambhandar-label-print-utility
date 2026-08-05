@@ -160,3 +160,29 @@ ipcMain.handle('export-report', async (_event, options: { range: 'today' | '7day
     return { success: false, message: `Failed to save CSV file: ${err.message}` };
   }
 });
+
+// IPC Handler: Open Native File Picker for Excel / CSV Import
+ipcMain.handle('open-excel-file', async () => {
+  if (!mainWindow) return null;
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Excel or CSV File for Bulk Label Import',
+    filters: [
+      { name: 'Excel / CSV Files (*.xlsx, *.xls, *.csv)', extensions: ['xlsx', 'xls', 'csv'] }
+    ],
+    properties: ['openFile']
+  });
+
+  if (canceled || filePaths.length === 0) return null;
+
+  try {
+    const fileBuffer = fs.readFileSync(filePaths[0]);
+    return {
+      fileName: path.basename(filePaths[0]),
+      filePath: filePaths[0],
+      buffer: fileBuffer.buffer.slice(fileBuffer.byteOffset, fileBuffer.byteOffset + fileBuffer.byteLength)
+    };
+  } catch (err: any) {
+    console.error('Failed to read Excel file:', err);
+    return null;
+  }
+});

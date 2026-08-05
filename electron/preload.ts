@@ -11,5 +11,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPrinters: () => ipcRenderer.invoke('get-printers'),
   printLabel: (request: any) => ipcRenderer.invoke('print-label', request),
   getSettings: () => ipcRenderer.invoke('get-settings'),
-  saveSettings: (settingsMap: Record<string, string>) => ipcRenderer.invoke('save-settings', settingsMap)
+  saveSettings: (settingsMap: Record<string, string>) => ipcRenderer.invoke('save-settings', settingsMap),
+  openExcelFile: () => ipcRenderer.invoke('open-excel-file')
 });

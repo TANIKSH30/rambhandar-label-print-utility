@@ -54,6 +54,7 @@ web_modules/
 dist
 dist-electron
 release
+release.zip
 
 # Editor directories and files
 .vscode/*

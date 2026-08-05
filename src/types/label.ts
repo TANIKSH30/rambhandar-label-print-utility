@@ -77,6 +77,7 @@ export interface ElectronAPI {
     startDate?: string;
     endDate?: string;
   }) => Promise<{ success: boolean; message: string; filePath?: string }>;
+  openExcelFile: () => Promise<{ fileName: string; filePath: string; buffer: ArrayBuffer } | null>;
 }
 
 declare global {

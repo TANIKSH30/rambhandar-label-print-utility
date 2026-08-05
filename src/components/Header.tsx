@@ -1,6 +1,6 @@
 import React from 'react';
 import logoImage from '../assets/logo.jpeg';
-import { Printer, History, Download, Settings as SettingsIcon, HelpCircle, LayoutGrid } from 'lucide-react';
+import { Printer, History, Download, Settings as SettingsIcon, HelpCircle, LayoutGrid, FileSpreadsheet } from 'lucide-react';
 import { PrinterStatusType } from '../types/label';
 
 interface HeaderProps {
@@ -11,6 +11,7 @@ interface HeaderProps {
   onOpenTemplates: () => void;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
+  onOpenImportExcel: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,7 +21,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenExport,
   onOpenTemplates,
   onOpenSettings,
-  onOpenHelp
+  onOpenHelp,
+  onOpenImportExcel
 }) => {
   return (
     <header className="bg-[#0B1B3A] text-white px-6 py-3.5 flex items-center justify-between shadow-md select-none border-b border-slate-800 shrink-0">
@@ -49,6 +51,16 @@ export const Header: React.FC<HeaderProps> = ({
         
         {/* Navigation Action Buttons */}
         <div className="hidden lg:flex items-center gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+          <button
+            type="button"
+            onClick={onOpenImportExcel}
+            title="Import Excel / CSV Bulk File"
+            className="px-3.5 py-1.5 bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 font-black text-xs rounded-lg flex items-center gap-1.5 transition shadow-sm"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-slate-950" />
+            <span>Import Excel</span>
+          </button>
+
           <button
             type="button"
             onClick={onOpenTemplates}
