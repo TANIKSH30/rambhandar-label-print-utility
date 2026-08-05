@@ -41,7 +41,7 @@ const BarcodeImage = ({ text, height, bw, orientation, x, y }: { text: string, h
 
   if (!dataUrl) return null;
 
-  // Exact ZPL ^FO440,53 ^BY4 ^BCB,62 bounds: bar height = 62 dots along X-axis, barcode length ~265 dots along Y-axis
+  // Exact ZPL ^FO455,53 ^BY4 ^BCB,62 bounds: bar height = 62 dots along X-axis, barcode length ~265 dots along Y-axis
   const width = orientation === 'B' ? 62 : 265;
   const imgHeight = orientation === 'B' ? 265 : 62;
 
