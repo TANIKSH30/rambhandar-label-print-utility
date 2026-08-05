@@ -56,9 +56,9 @@ export function generateZPL(data: LabelData, copies: number = 1): string {
     `^A0B,34,24^FDPACKED DATE: ${data.packedDate}^FS`,
     "^FT441,368",
     `^A0B,34,24^FDBEST BEFORE : ${data.bestBefore}^FS`,
-    "^FO480,53",
+    "^FO480,140",
     `^BY4^BCB,62,N,N^FD>;1${data.barcodeNumber}^FS`,
-    "^FT575,298",
+    "^FT575,370",
     `^A0B,34,46^FD${data.barcodeNumber}^FS`,
     `^PQ${copies},0,1,Y`,
     "^XZ"
