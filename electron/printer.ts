@@ -223,10 +223,13 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
       window.webContents.print({
         silent: false,
         printBackground: true,
-        deviceName: targetPrinterName || undefined
+        deviceName: targetPrinterName || undefined,
+        copies: copies,
+        color: false,
+        pageSize: { width: 80000, height: 50000 }
       }, (success, failureReason) => {
         if (!success && failureReason !== 'cancelled' && failureReason !== 'user_canceled') {
-          console.warn('Windows Print Dialog notice:', failureReason);
+          console.error('Print failed:', failureReason);
         }
       });
     }
