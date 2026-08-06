@@ -14,10 +14,7 @@ import {
   getProductMasterFromDB,
   saveProductMasterToDB,
   syncExcelToProductMasterDB
-} from './database';
-
-app.commandLine.appendSwitch('enable-print-preview');
-
+// Native Electron Initialization
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {

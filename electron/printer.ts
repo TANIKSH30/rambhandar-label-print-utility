@@ -13,7 +13,7 @@ export interface PrintRequest {
   language: 'Zebra ZPL II' | 'Honeywell Fingerprint' | 'Toshiba TPCL';
 }
 
-const THERMAL_PRINTER_REGEX = /zebra|honeywell|intermec|toshiba|tsc|datamax|sato|bixolon|thermal|zpl|godex|xprinter|gprinter|pos|label/i;
+const THERMAL_PRINTER_REGEX = /zebra|honeywell|intermec|toshiba|tsc|datamax|sato|bixolon|thermal|zpl|godex|xprinter|gprinter|pos|label|direct thermal/i;
 
 /**
  * Enumerate printers installed on Windows OS using native Electron API
