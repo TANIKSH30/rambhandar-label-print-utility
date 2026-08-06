@@ -59,6 +59,10 @@
 
 /* 80mm x 50mm Printable Label Styling for Windows Print Dialog */
 @media print {
+  #root {
+    display: none !important;
+  }
+
   html, body {
     background: white !important;
     color: black !important;
@@ -69,22 +73,8 @@
     overflow: hidden !important;
   }
 
-  body * {
-    visibility: hidden !important;
-  }
-
   #printable-zebra-label,
-  #printable-zebra-label *,
-  .printable-zebra-label,
-  .printable-zebra-label *,
-  .thermal-label-paper,
-  .thermal-label-paper * {
-    visibility: visible !important;
-  }
-
-  #printable-zebra-label,
-  .printable-zebra-label,
-  .thermal-label-paper {
+  .printable-zebra-label {
     display: block !important;
     position: fixed !important;
     left: 0 !important;
@@ -99,7 +89,15 @@
     margin: 0 !important;
     padding: 0 !important;
     background: white !important;
-    z-index: 999999 !important;
+    z-index: 9999999 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  #printable-zebra-label *,
+  .printable-zebra-label * {
+    visibility: visible !important;
     opacity: 1 !important;
   }
 

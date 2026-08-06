@@ -219,81 +219,28 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
       }
     }
 
-    // 4. Windows Printer Fallback: Use a hidden BrowserWindow containing ONLY the label SVG
-    //    so Chromium can generate a proper print preview (avoids "This app doesn't support print preview")
+    // 4. Windows Printer Fallback: Call webContents.print directly on mainWindow
+    //    @media print in index.css isolates #printable-zebra-label (80mm x 50mm)
     if (window) {
-      const labelSvgHtml = request.labelHtml || '';
-
-      // Build a minimal standalone HTML page with just the 80x50mm label SVG
-      const printPageHtml = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    width: 80mm;
-    height: 50mm;
-    background: white;
-    overflow: hidden;
-  }
-  svg {
-    width: 80mm !important;
-    height: 50mm !important;
-    display: block;
-  }
-  @page {
-    size: 80mm 50mm;
-    margin: 0;
-  }
-</style>
-</head>
-<body>${labelSvgHtml}</body>
-</html>`;
-
-      // Write to a temp file (avoids data-URL length limits)
-      const tempHtmlPath = path.join(os.tmpdir(), `matadin_label_${Date.now()}.html`);
-      fs.writeFileSync(tempHtmlPath, printPageHtml, 'utf-8');
-
-      // Create hidden print window — this window contains ONLY the label, so preview works
-      const printWindow = new BrowserWindow({
-        width: 303,   // 80mm at 96dpi
-        height: 189,  // 50mm at 96dpi
-        show: false,
-        skipTaskbar: true,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true
-        }
-      });
-
-      await printWindow.loadFile(tempHtmlPath);
-
+      console.log('Triggering Windows print dialog on mainWindow for printer:', targetPrinterName);
+      
       await new Promise<void>((resolve) => {
-        printWindow.webContents.print(
+        window.webContents.print(
           {
             silent: false,
             printBackground: true,
             deviceName: (targetPrinterName && targetPrinterName !== 'Direct Thermal Spooler') ? targetPrinterName : undefined,
             copies: copies,
-            color: false,
+            color: true,
             margins: { marginType: 'none' },
             pageSize: { width: 80000, height: 50000 }
           },
           (success, failureReason) => {
-            if (!success && failureReason !== 'cancelled' && failureReason !== 'user_canceled') {
-              console.error('Hidden print window: print failed:', failureReason);
-            } else {
-              console.log('Hidden print window: print result:', success ? 'SUCCESS' : failureReason);
-            }
+            console.log('mainWindow print result:', success ? 'SUCCESS' : failureReason);
             resolve();
           }
         );
       });
-
-      // Cleanup hidden window and temp file
-      try { printWindow.destroy(); } catch (_) {}
-      try { fs.unlinkSync(tempHtmlPath); } catch (_) {}
     }
 
     savePrintRecordOnlyOnSuccess(labelData, copies, targetPrinterName || 'Windows Print Dialog', language, 'SUCCESS').catch(err => {

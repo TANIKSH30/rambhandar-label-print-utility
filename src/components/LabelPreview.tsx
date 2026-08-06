@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LabelData, PrinterDevice } from '../types/label';
 import bwipjs from 'bwip-js';
 import { Eye, Sliders, CheckCircle2, Printer, RefreshCw, Minus, Plus } from 'lucide-react';
@@ -257,12 +258,15 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
 
       {/* Main Container */}
       <div className="bg-[#F3F4F6] p-6 flex-1 flex flex-col items-center justify-center relative overflow-auto">
-        {/* Always rendered in DOM for @media print and Electron webContents.print() */}
-        <div id="printable-zebra-label" className="printable-zebra-label">
-          <svg viewBox="0 0 590 400" className="w-full h-full text-black block overflow-hidden bg-white">
-            {parseZplToSVG(generateZPLString(labelData))}
-          </svg>
-        </div>
+        {/* Always rendered directly on document.body via Portal for @media print and Electron webContents.print() */}
+        {createPortal(
+          <div id="printable-zebra-label" className="printable-zebra-label">
+            <svg viewBox="0 0 590 400" className="w-full h-full text-black block overflow-hidden bg-white">
+              {parseZplToSVG(generateZPLString(labelData))}
+            </svg>
+          </div>,
+          document.body
+        )}
 
         {activeTab === 'preview' ? (
           <div className="w-full max-w-[540px] my-auto flex flex-col items-center">
