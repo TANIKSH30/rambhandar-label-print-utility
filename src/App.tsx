@@ -215,11 +215,6 @@ export const App: React.FC = () => {
   }, [appSettings]);
 
   const handlePrint = async () => {
-    if (printerStatus === 'offline') {
-      setPrintStatus({ type: 'error', message: 'Thermal printer is offline or disconnected.' });
-      return;
-    }
-
     setIsPrinting(true);
     setPrintStatus(null);
     setPrintProgress({ current: 1, total: copies });
@@ -249,12 +244,12 @@ export const App: React.FC = () => {
         if (response.success) {
           setPrintStatus({ type: 'success', message: response.message || 'Label Printed Successfully' });
         } else {
-          setPrintStatus({ type: 'error', message: response.message || 'Printer not connected.' });
+          setPrintStatus({ type: 'error', message: response.message || 'Print error occurred.' });
         }
       } else {
         clearInterval(progressInterval);
         window.print();
-        setPrintStatus({ type: 'success', message: 'Print Dialog Opened' });
+        setPrintStatus({ type: 'success', message: 'Using Windows Print Dialog' });
       }
     } catch (error: any) {
       clearInterval(progressInterval);

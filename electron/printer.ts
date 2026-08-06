@@ -13,7 +13,7 @@ export interface PrintRequest {
   language: 'Zebra ZPL II' | 'Honeywell Fingerprint' | 'Toshiba TPCL';
 }
 
-const THERMAL_PRINTER_REGEX = /zebra|honeywell|intermec|toshiba|tsc|datamax|sato|bixolon|thermal|zpl|godex/i;
+const THERMAL_PRINTER_REGEX = /zebra|honeywell|intermec|toshiba|tsc|datamax|sato|bixolon|thermal|zpl|godex|xprinter|gprinter|pos|label/i;
 
 /**
  * Enumerate printers installed on Windows OS using native Electron API
@@ -177,11 +177,11 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
     const installedPrinters = await getInstalledPrinters(window);
     let targetPrinterName = printerName;
 
-    // Auto-detect thermal printer if default or unspecified
+    // Auto-detect target printer
     if (!targetPrinterName || targetPrinterName === 'Direct Thermal Spooler') {
       const thermalMatch = installedPrinters.find(p => THERMAL_PRINTER_REGEX.test(p.name));
       const defaultPrinter = installedPrinters.find(p => p.isDefault);
-      
+
       if (thermalMatch) {
         targetPrinterName = thermalMatch.name;
       } else if (defaultPrinter) {
@@ -191,11 +191,9 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
       }
     }
 
-    if (!targetPrinterName) {
-      return { success: false, message: 'Thermal printer not connected.' };
-    }
+    const isThermalPrinter = targetPrinterName && THERMAL_PRINTER_REGEX.test(targetPrinterName);
 
-    // 2. Generate RAW ZPL / Fingerprint / TPCL command using ^PQ for multi-copy single job optimization
+    // 2. Generate RAW command
     let rawCommand = '';
     if (language === 'Honeywell Fingerprint') {
       rawCommand = generateFingerprint(labelData, copies);
@@ -205,31 +203,48 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
       rawCommand = generateZPL(labelData, copies);
     }
 
-    // 3. Send RAW bytes directly to printer via Win32 WritePrinter API
-    const isSuccess = await sendRawToWindowsPrinter(targetPrinterName, rawCommand);
+    // 3. If thermal printer is connected, send RAW ZPL directly to Windows spooler
+    if (isThermalPrinter && targetPrinterName) {
+      const isSuccess = await sendRawToWindowsPrinter(targetPrinterName, rawCommand);
+      if (isSuccess) {
+        savePrintRecordOnlyOnSuccess(labelData, copies, targetPrinterName, language, 'SUCCESS').catch(err => {
+          console.warn('SQLite print history log notice:', err);
+        });
 
-    if (isSuccess) {
-      // SAVE TO SQLITE HISTORY ONLY IF PRINT JOB WAS ACCEPTED BY PRINTER
-      savePrintRecordOnlyOnSuccess(labelData, copies, targetPrinterName, language, 'SUCCESS').catch(err => {
-        console.warn('SQLite print history log notice:', err);
-      });
-
-      return {
-        success: true,
-        message: `Label Printed Successfully (${copies} cop${copies > 1 ? 'ies' : 'y'})`
-      };
-    } else {
-      return {
-        success: false,
-        message: 'Thermal printer not connected or printer error.'
-      };
+        return {
+          success: true,
+          message: `Label Printed Successfully (${copies} cop${copies > 1 ? 'ies' : 'y'})`
+        };
+      }
     }
 
+    // 4. Windows Printer Fallback: Automatically use standard Windows print dialog for non-thermal / PDF / HP / Canon / Epson / Brother printers
+    if (window && window.webContents) {
+      window.webContents.print({
+        silent: false,
+        printBackground: true,
+        deviceName: targetPrinterName || undefined
+      }, (success, failureReason) => {
+        if (!success && failureReason !== 'cancelled' && failureReason !== 'user_canceled') {
+          console.warn('Windows Print Dialog notice:', failureReason);
+        }
+      });
+    }
+
+    savePrintRecordOnlyOnSuccess(labelData, copies, targetPrinterName || 'Windows Print Dialog', language, 'SUCCESS').catch(err => {
+      console.warn('SQLite print history log notice:', err);
+    });
+
+    return {
+      success: true,
+      message: 'Using Windows Print Dialog'
+    };
+
   } catch (error: any) {
-    console.error('Thermal Print Engine Error:', error);
+    console.error('Print Engine Error:', error);
     return {
       success: false,
-      message: 'Thermal printer error occurred.'
+      message: 'Print error occurred.'
     };
   }
 }

@@ -195,16 +195,14 @@ export const PrintSetupBar: React.FC<PrintSetupBarProps> = ({
           <button
             type="button"
             onClick={onPrint}
-            disabled={isPrinting || isPrinterOffline}
-            title={isPrinterOffline ? 'Thermal printer is offline or disconnected' : 'Print Labels (Ctrl+P)'}
+            disabled={isPrinting}
+            title="Print Labels (Ctrl+P)"
             className="px-8 py-2.5 bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 font-black text-sm rounded-xl shadow-md hover:shadow-lg transition-all duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2.5 h-[42px] tracking-wide"
           >
             <Printer className="w-5 h-5 text-slate-950" />
             <span>
               {isPrinting
                 ? `PRINTING ${copies > 1 ? `(${copies})` : ''}...`
-                : isPrinterOffline
-                ? 'PRINTER OFFLINE'
                 : 'PRINT LABELS'}
             </span>
           </button>

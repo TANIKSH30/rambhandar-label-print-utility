@@ -13,7 +13,7 @@
     "electron:dev": "concurrently -k \"vite\" \"npm:electron:start\"",
     "electron:start": "wait-on tcp:5173 && electron .",
     "electron:build": "npm run build",
-    "dist": "npm run electron:build && electron-builder --win dir"
+    "dist": "npm run electron:build && electron-builder --win nsis portable dir"
   },
   "dependencies": {
     "@types/sql.js": "^1.4.11",

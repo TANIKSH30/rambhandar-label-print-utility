@@ -16,7 +16,10 @@ import {
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
-  const preloadPath = path.join(__dirname, 'preload.js');
+  let preloadPath = path.join(__dirname, 'preload.js');
+  if (!fs.existsSync(preloadPath)) {
+    preloadPath = path.join(app.getAppPath(), 'dist-electron', 'preload.js');
+  }
   console.log('Initializing BrowserWindow with preload:', preloadPath);
 
   mainWindow = new BrowserWindow({
