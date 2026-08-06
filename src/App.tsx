@@ -237,11 +237,20 @@ export const App: React.FC = () => {
 
     try {
       if (window.electronAPI?.printLabel) {
+        // Capture the label's SVG HTML from the DOM for the hidden print window preview
+        let labelHtml = '';
+        const labelEl = document.getElementById('printable-zebra-label');
+        if (labelEl) {
+          const svgEl = labelEl.querySelector('svg');
+          labelHtml = svgEl ? svgEl.outerHTML : labelEl.innerHTML;
+        }
+
         const response = await window.electronAPI.printLabel({
           labelData,
           copies,
           printerName: selectedPrinter,
-          language
+          language,
+          labelHtml
         });
 
         clearInterval(progressInterval);

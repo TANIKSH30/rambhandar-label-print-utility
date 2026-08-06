@@ -65,6 +65,7 @@ export interface ElectronAPI {
     copies: number;
     printerName: string;
     language: PrinterLanguage;
+    labelHtml?: string;
   }) => Promise<{ success: boolean; message: string }>;
   getPrintHistory: (params?: { search?: string; limit?: number }) => Promise<PrintHistoryRecord[]>;
   getTemplates: () => Promise<ProductTemplate[]>;
