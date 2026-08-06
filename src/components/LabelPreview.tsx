@@ -15,48 +15,27 @@ interface LabelPreviewProps {
   onRefreshPrinters?: () => void;
 }
 
-const BarcodeImage = ({ text, orientation, x, y }: { text: string, height: number, bw: number, orientation: string, x: number, y: number }) => {
-  const [dataUrl, setDataUrl] = useState<string>('');
-  const [dimensions, setDimensions] = useState({ w: 62, h: 212 });
+const BarcodeCanvas = ({ value, width = 2.0, height = 165 }: { value: string; width?: number; height?: number }) => {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
-    if (!text) return;
-
-    try {
-      const canvas = document.createElement('canvas');
-
-      bwipjs.toCanvas(canvas, {
-        bcid: 'code128',
-        text,
-        scale: 2,
-        height: 15,
-        includetext: false,
-        rotate: orientation === 'B' ? 'L' : 'N'
-      });
-
-      setDimensions({
-        w: canvas.width,
-        h: canvas.height
-      });
-
-      setDataUrl(canvas.toDataURL('image/png'));
-    } catch (err) {
-      console.warn('Barcode rendering warning:', err);
+  React.useEffect(() => {
+    if (canvasRef.current && value) {
+      try {
+        bwipjs.toCanvas(canvasRef.current, {
+          bcid: 'code128',
+          text: value,
+          scale: width,
+          height: height,
+          includetext: false,
+          rotate: 'L'
+        });
+      } catch (err) {
+        console.warn('BarcodeCanvas rendering warning:', err);
+      }
     }
-  }, [text, orientation]);
+  }, [value, width, height]);
 
-  if (!dataUrl) return null;
-
-  return (
-    <image
-      x={x}
-      y={y}
-      width={dimensions.w}
-      height={dimensions.h}
-      href={dataUrl}
-      preserveAspectRatio="none"
-    />
-  );
+  return <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />;
 };
 
 export const LabelPreview: React.FC<LabelPreviewProps> = ({
@@ -105,14 +84,14 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
 ^A0B,34,29^FDBATCH NO. ${data.batchNumber || 'sep2026'}^FS
 ^FT405,368
 ^A0B,34,24^FDPACKED DATE: ${data.packedDate || '30 - 09 - 2026'}^FS
-^FT441,368
+^FT445,368
 ^A0B,34,24^FDBEST BEFORE : ${data.bestBefore || '15 - 12 - 2026'}^FS
-^FO430,75
-^BY4
-^BCB,62,N,N
+^FO432,72
+^BY2
+^BCB,165,N,N
 ^FD>;1${data.barcodeNumber || '12345678'}^FS
-^FT524,320
-^A0B,34,46
+^FT520,302
+^A0B,24,24
 ^FD${data.barcodeNumber || '12345678'}^FS
 ^PQ1,0,1,Y
 ^XZ`;
@@ -129,7 +108,7 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
     let isFT = true;
 
     let barcodeWidth = 2;
-    let barcodeHeight = 62;
+    let barcodeHeight = 165;
     let isBarcode = false;
 
     commands.forEach((cmd, index) => {
@@ -163,7 +142,7 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
       } else if (cmd.startsWith('BC')) {
         orientation = cmd.charAt(2);
         const parts = cmd.substring(4).split(',');
-        barcodeHeight = parseInt(parts[0] || '62', 10);
+        barcodeHeight = parseInt(parts[0] || '165', 10);
         isBarcode = true;
       } else if (cmd.startsWith('FD')) {
         const text = cmd.substring(2).split('^FS')[0].split('~FS')[0];
@@ -171,53 +150,69 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
         if (isBarcode) {
           const cleanText = text.replace('>;1', '');
           elements.push(
-            <BarcodeImage
-              key={'bc' + index}
-              text={cleanText}
-              height={barcodeHeight}
-              bw={barcodeWidth}
-              orientation={orientation}
-              x={currentX}
-              y={currentY}
-            />
+            <foreignObject key={'bc' + index} x={currentX} y={currentY} width="64" height="230">
+              <div style={{ width: '64px', height: '230px' }}>
+                <BarcodeCanvas
+                  value={cleanText || '12345678'}
+                  width={2.0}
+                  height={barcodeHeight}
+                />
+              </div>
+            </foreignObject>
           );
         } else {
-          // Precise ZPL dot scale formula to match reference label
-          const scaleX = (fontWidth * 0.5) / (fontHeight * 0.54);
-
-          if (orientation === 'B') {
+          if (currentX === 520 && currentY === 302) {
             elements.push(
-              <g key={'txt' + index} transform={`translate(${currentX}, ${currentY}) rotate(-90)`}>
-                <text
-                  x={0}
-                  y={0}
-                  fontFamily="'Arial Narrow', Arial, 'Helvetica Neue', sans-serif"
-                  fontWeight="bold"
-                  fontSize={fontHeight}
-                  fill="black"
-                  transform={`scale(${scaleX}, 1)`}
-                >
-                  {text}
-                </text>
-              </g>
+              <text
+                key={'txt' + index}
+                x="520"
+                y="302"
+                transform="rotate(-90 520 302)"
+                className="zpl-text"
+                fontSize="24"
+                fontFamily="monospace"
+                fill="black"
+              >
+                {text}
+              </text>
             );
           } else {
-            elements.push(
-              <g key={'txt' + index} transform={`translate(${currentX}, ${currentY})`}>
-                <text
-                  x={0}
-                  y={0}
-                  fontFamily="'Arial Narrow', Arial, 'Helvetica Neue', sans-serif"
-                  fontWeight="bold"
-                  fontSize={fontHeight}
-                  fill="black"
-                  transform={`scale(${scaleX}, 1)`}
-                  alignmentBaseline={isFT ? "baseline" : "hanging"}
-                >
-                  {text}
-                </text>
-              </g>
-            );
+            const scaleX = (fontWidth * 0.5) / (fontHeight * 0.54);
+
+            if (orientation === 'B') {
+              elements.push(
+                <g key={'txt' + index} transform={`translate(${currentX}, ${currentY}) rotate(-90)`}>
+                  <text
+                    x={0}
+                    y={0}
+                    fontFamily="'Arial Narrow', Arial, 'Helvetica Neue', sans-serif"
+                    fontWeight="bold"
+                    fontSize={fontHeight}
+                    fill="black"
+                    transform={`scale(${scaleX}, 1)`}
+                  >
+                    {text}
+                  </text>
+                </g>
+              );
+            } else {
+              elements.push(
+                <g key={'txt' + index} transform={`translate(${currentX}, ${currentY})`}>
+                  <text
+                    x={0}
+                    y={0}
+                    fontFamily="'Arial Narrow', Arial, 'Helvetica Neue', sans-serif"
+                    fontWeight="bold"
+                    fontSize={fontHeight}
+                    fill="black"
+                    transform={`scale(${scaleX}, 1)`}
+                    alignmentBaseline={isFT ? "baseline" : "hanging"}
+                  >
+                    {text}
+                  </text>
+                </g>
+              );
+            }
           }
         }
       }
