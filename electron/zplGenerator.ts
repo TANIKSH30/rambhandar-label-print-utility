@@ -56,10 +56,10 @@ export function generateZPL(data: LabelData, copies: number = 1): string {
     `^A0B,34,24^FDPACKED DATE: ${data.packedDate}^FS`,
     "^FT441,368",
     `^A0B,34,24^FDBEST BEFORE : ${data.bestBefore}^FS`,
-    "^FO455,53",
+    "^FO475,130",
     `^BY4^BCB,62,N,N^FD>;1${data.barcodeNumber}^FS`,
-    "^FT549,298",
-    `^A0B,34,46^FD${data.barcodeNumber}^FS`,
+    "^FT565,335",
+    `^A0B,40,70^FD${data.barcodeNumber}^FS`,
     `^PQ${copies},0,1,Y`,
     "^XZ"
   ].join("\n");
@@ -99,7 +99,7 @@ export function generateTPCL(data: LabelData, copies: number = 1): string {
     '{C|}',
     `{PC000;0027,0329,1,1,J,00,B=MATADIN RAM BHANDAR|}`,
     `{PC001;0260,0372,1,1,G,00,B=${data.productName}|}`,
-    `{XB00;0455,0053,3,3,02,1,0062,+0000000000|${data.barcodeNumber}|}`,
+    `{XB00;0475,0130,3,3,02,1,0062,+0000000000|${data.barcodeNumber}|}`,
     `{XS;I,${copiesPadded},0002|}`
   ].join("\n");
 }

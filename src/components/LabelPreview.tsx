@@ -86,10 +86,10 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
 ^A0B,34,24^FDPACKED DATE: ${data.packedDate || '30 - 09 - 2026'}^FS
 ^FT441,368
 ^A0B,34,24^FDBEST BEFORE : ${data.bestBefore || '15 - 12 - 2026'}^FS
-^FO455,53
+^FO475,130
 ^BY4^BCB,62,N,N^FD>;1${data.barcodeNumber || '12345678'}^FS
-^FT549,298
-^A0B,34,46^FD${data.barcodeNumber || '12345678'}^FS
+^FT565,335
+^A0B,40,70^FD${data.barcodeNumber || '12345678'}^FS
 ^PQ1,0,1,Y
 ^XZ`;
 
@@ -158,7 +158,7 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
             </foreignObject>
           );
         } else {
-          if (currentX === 549 && currentY === 298) {
+          if (currentX === 565 && currentY === 335) {
             elements.push(
               <text
                 key={'txt' + index}
@@ -166,8 +166,10 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
                 y={currentY}
                 transform={`rotate(-90 ${currentX} ${currentY})`}
                 className="zpl-text"
-                fontSize="24"
-                fontFamily="monospace"
+                fontSize="30"
+                fontWeight="900"
+                fontFamily="'Arial Black', Arial, Helvetica, sans-serif"
+                letterSpacing="2px"
                 fill="black"
               >
                 {text}
