@@ -520,7 +520,7 @@ export async function saveProductMasterToDB(item: ProductMasterDBRecord): Promis
     `;
 
     dbInstance.run(query);
-    persistDatabase();
+    saveDatabase();
     return true;
   } catch (err) {
     console.error('Failed to save Product Master item to SQLite:', err);
