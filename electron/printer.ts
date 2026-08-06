@@ -226,7 +226,13 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
         deviceName: targetPrinterName || undefined,
         copies: copies,
         color: false,
-        pageSize: { width: 80000, height: 50000 }
+        margins: {
+          marginType: 'none'
+        },
+        pageSize: {
+          width: 80000,
+          height: 50000
+        }
       }, (success, failureReason) => {
         if (!success && failureReason !== 'cancelled' && failureReason !== 'user_canceled') {
           console.error('Print failed:', failureReason);

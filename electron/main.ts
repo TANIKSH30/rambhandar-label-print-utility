@@ -13,6 +13,8 @@ import {
   exportPrintLogsCSV
 } from './database';
 
+app.commandLine.appendSwitch('enable-print-preview');
+
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
