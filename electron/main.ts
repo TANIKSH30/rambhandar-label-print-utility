@@ -14,6 +14,8 @@ import {
   getProductMasterFromDB,
   saveProductMasterToDB,
   syncExcelToProductMasterDB
+} from './database';
+
 // Native Electron Initialization
 let mainWindow: BrowserWindow | null = null;
 
