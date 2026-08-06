@@ -258,7 +258,7 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
       {/* Main Container */}
       <div className="bg-[#F3F4F6] p-6 flex-1 flex flex-col items-center justify-center relative overflow-auto">
         {/* Always rendered in DOM for @media print and Electron webContents.print() */}
-        <div id="printable-zebra-label" className="printable-zebra-label hidden print:block">
+        <div id="printable-zebra-label" className="printable-zebra-label">
           <svg viewBox="0 0 590 400" className="w-full h-full text-black block overflow-hidden bg-white">
             {parseZplToSVG(generateZPLString(labelData))}
           </svg>

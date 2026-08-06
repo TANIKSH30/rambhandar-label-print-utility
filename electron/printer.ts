@@ -1,4 +1,4 @@
-import { BrowserWindow, PrinterInfo, shell } from 'electron';
+import { BrowserWindow, PrinterInfo } from 'electron';
 import { generateZPL, generateFingerprint, generateTPCL, LabelData } from './zplGenerator';
 import { savePrintRecordOnlyOnSuccess } from './database';
 import * as fs from 'fs';
@@ -218,31 +218,31 @@ export async function printLabel(window: BrowserWindow, request: PrintRequest): 
       }
     }
 
-    // 4. Windows Printer Fallback: For non-thermal / PDF / HP / Canon / Epson / Brother printers
+    // 4. Windows Printer Fallback: Automatically use standard Windows print dialog for non-thermal / PDF / HP / Canon / Epson / Brother printers
     if (window && window.webContents) {
-      try {
-        const pdfBuffer = await window.webContents.printToPDF({
-          printBackground: true,
-          margins: { marginType: 'none' },
-          pageSize: { width: 80000, height: 50000 }
-        });
-
-        const tempDir = os.tmpdir();
-        const tempPdfPath = path.join(tempDir, `Matadin_Label_${Date.now()}.pdf`);
-        fs.writeFileSync(tempPdfPath, pdfBuffer);
-
-        // Open native Windows high-resolution PDF preview
-        await shell.openPath(tempPdfPath);
-      } catch (pdfErr) {
-        console.error('PDF generation error, falling back to webContents.print:', pdfErr);
-        window.webContents.print({
+      window.webContents.print(
+        {
           silent: false,
           printBackground: true,
+          deviceName: (targetPrinterName && targetPrinterName !== 'Direct Thermal Spooler') ? targetPrinterName : undefined,
+          copies: copies,
           color: false,
-          margins: { marginType: 'none' },
-          pageSize: { width: 80000, height: 50000 }
-        });
-      }
+          margins: {
+            marginType: 'none'
+          },
+          pageSize: {
+            width: 80000,
+            height: 50000
+          }
+        },
+        (success, failureReason) => {
+          if (!success && failureReason !== 'cancelled' && failureReason !== 'user_canceled') {
+            console.error('Electron webContents.print failed:', failureReason);
+          } else {
+            console.log('Electron webContents.print callback result:', success ? 'SUCCESS' : failureReason);
+          }
+        }
+      );
     }
 
     savePrintRecordOnlyOnSuccess(labelData, copies, targetPrinterName || 'Windows Print Dialog', language, 'SUCCESS').catch(err => {
