@@ -84,15 +84,12 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
 ^A0B,34,29^FDBATCH NO. ${data.batchNumber || 'sep2026'}^FS
 ^FT405,368
 ^A0B,34,24^FDPACKED DATE: ${data.packedDate || '30 - 09 - 2026'}^FS
-^FT445,368
+^FT441,368
 ^A0B,34,24^FDBEST BEFORE : ${data.bestBefore || '15 - 12 - 2026'}^FS
-^FO432,72
-^BY2
-^BCB,165,N,N
-^FD>;1${data.barcodeNumber || '12345678'}^FS
-^FT520,302
-^A0B,24,24
-^FD${data.barcodeNumber || '12345678'}^FS
+^FO455,53
+^BY4^BCB,62,N,N^FD>;1${data.barcodeNumber || '12345678'}^FS
+^FT549,298
+^A0B,34,46^FD${data.barcodeNumber || '12345678'}^FS
 ^PQ1,0,1,Y
 ^XZ`;
 
@@ -107,8 +104,8 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
     let orientation = 'N';
     let isFT = true;
 
-    let barcodeWidth = 2;
-    let barcodeHeight = 165;
+    let barcodeWidth = 4;
+    let barcodeHeight = 62;
     let isBarcode = false;
 
     commands.forEach((cmd, index) => {
@@ -138,11 +135,11 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
         );
       } else if (cmd.startsWith('BY')) {
         const parts = cmd.substring(2).split(',');
-        barcodeWidth = parseInt(parts[0] || '2', 10);
+        barcodeWidth = parseInt(parts[0] || '4', 10);
       } else if (cmd.startsWith('BC')) {
         orientation = cmd.charAt(2);
         const parts = cmd.substring(4).split(',');
-        barcodeHeight = parseInt(parts[0] || '165', 10);
+        barcodeHeight = parseInt(parts[0] || '62', 10);
         isBarcode = true;
       } else if (cmd.startsWith('FD')) {
         const text = cmd.substring(2).split('^FS')[0].split('~FS')[0];
@@ -155,19 +152,19 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({
                 <BarcodeCanvas
                   value={cleanText || '12345678'}
                   width={2.0}
-                  height={barcodeHeight}
+                  height={62}
                 />
               </div>
             </foreignObject>
           );
         } else {
-          if (currentX === 520 && currentY === 302) {
+          if (currentX === 549 && currentY === 298) {
             elements.push(
               <text
                 key={'txt' + index}
-                x="520"
-                y="302"
-                transform="rotate(-90 520 302)"
+                x={currentX}
+                y={currentY}
+                transform={`rotate(-90 ${currentX} ${currentY})`}
                 className="zpl-text"
                 fontSize="24"
                 fontFamily="monospace"
