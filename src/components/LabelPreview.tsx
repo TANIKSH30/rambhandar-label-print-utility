@@ -15,42 +15,44 @@ interface LabelPreviewProps {
   onRefreshPrinters?: () => void;
 }
 
-const BarcodeImage = ({ text, height, bw, orientation, x, y }: { text: string, height: number, bw: number, orientation: string, x: number, y: number }) => {
+const BarcodeImage = ({ text, orientation, x, y }: { text: string, height: number, bw: number, orientation: string, x: number, y: number }) => {
   const [dataUrl, setDataUrl] = useState<string>('');
+  const [dimensions, setDimensions] = useState({ w: 62, h: 212 });
 
   useEffect(() => {
-    if (text) {
-      try {
-        const canvas = document.createElement('canvas');
-        bwipjs.toCanvas(canvas, {
-          bcid: 'code128',
-          text: text,
-          scale: 3,
-          height: 18,
-          includetext: false,
-          barcolor: '000000',
-          rotate: orientation === 'B' ? 'L' : 'N'
-        });
+    if (!text) return;
 
-        setDataUrl(canvas.toDataURL('image/png'));
-      } catch (err) {
-        console.warn('Barcode rendering warning:', err);
-      }
+    try {
+      const canvas = document.createElement('canvas');
+
+      bwipjs.toCanvas(canvas, {
+        bcid: 'code128',
+        text,
+        scale: 2,
+        height: 15,
+        includetext: false,
+        rotate: orientation === 'B' ? 'L' : 'N'
+      });
+
+      setDimensions({
+        w: canvas.width,
+        h: canvas.height
+      });
+
+      setDataUrl(canvas.toDataURL('image/png'));
+    } catch (err) {
+      console.warn('Barcode rendering warning:', err);
     }
-  }, [text, height, bw, orientation]);
+  }, [text, orientation]);
 
   if (!dataUrl) return null;
-
-  // Exact ZPL ^FO455,53 ^BY4 ^BCB,62 bounds: bar height = 62 dots along X-axis, barcode length = 212 dots along Y-axis
-  const width = orientation === 'B' ? 62 : 212;
-  const imgHeight = orientation === 'B' ? 212 : 62;
 
   return (
     <image
       x={x}
       y={y}
-      width={width}
-      height={imgHeight}
+      width={dimensions.w}
+      height={dimensions.h}
       href={dataUrl}
       preserveAspectRatio="none"
     />
