@@ -55,15 +55,15 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   const [filterType, setFilterType] = useState<'all' | 'valid' | 'invalid' | 'duplicates'>('all');
   const [tempMapping, setTempMapping] = useState<ColumnMapping>(mapping);
 
-  if (!isOpen) return null;
+  const safeRows = useMemo(() => (Array.isArray(rows) ? rows.filter(Boolean) : []), [rows]);
 
   // Filtered rows for preview table
   const filteredRows = useMemo(() => {
-    return rows.filter((r) => {
+    return safeRows.filter((r) => {
       // Search filter
       const q = search.trim().toLowerCase();
       if (q) {
-        const matchStr = `${r.productName} ${r.barcodeNumber} ${r.batchNumber} ${r.netWeight} ${r.mrp}`.toLowerCase();
+        const matchStr = `${r.productName || ''} ${r.barcodeNumber || ''} ${r.batchNumber || ''} ${r.netWeight || ''} ${r.mrp || ''}`.toLowerCase();
         if (!matchStr.includes(q)) return false;
       }
 
@@ -74,11 +74,11 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
       return true;
     });
-  }, [rows, search, filterType]);
+  }, [safeRows, search, filterType]);
 
-  const validRows = useMemo(() => rows.filter((r) => r.isValid), [rows]);
-  const invalidRows = useMemo(() => rows.filter((r) => !r.isValid), [rows]);
-  const duplicateRows = useMemo(() => rows.filter((r) => r.isDuplicateInFile || r.isDuplicateInHistory), [rows]);
+  const validRows = useMemo(() => safeRows.filter((r) => r.isValid), [safeRows]);
+  const invalidRows = useMemo(() => safeRows.filter((r) => !r.isValid), [safeRows]);
+  const duplicateRows = useMemo(() => safeRows.filter((r) => r.isDuplicateInFile || r.isDuplicateInHistory), [safeRows]);
 
   const totalCopies = useMemo(() => {
     return validRows.reduce((acc, r) => acc + (r.copies || 1), 0);
@@ -87,6 +87,8 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   // Estimated print time formula: ~150ms per copy + 50ms setup overhead
   const estimatedSeconds = Math.ceil(totalCopies * 0.15 + validRows.length * 0.05);
   const estimatedMinStr = `${Math.floor(estimatedSeconds / 60)}m ${estimatedSeconds % 60}s`;
+
+  if (!isOpen) return null;
 
   const handleDownloadTemplateClick = () => {
     try {

@@ -147,8 +147,6 @@ export const syncExcelRowsToProductMaster = async (rows: Array<Record<string, an
     }
   });
 
-  if (formattedItems.length === 0) return await getProductMasterAsync();
-
   // SQLite Electron Async Sync
   if (window.electronAPI?.syncProductMaster) {
     try {
@@ -156,11 +154,34 @@ export const syncExcelRowsToProductMaster = async (rows: Array<Record<string, an
     } catch (err) {
       console.warn('SQLite Product Master bulk sync warning:', err);
     }
-  }
+  } else {
+    // Web Sync: Single Batch Merge into localStorage
+    const current = getProductMasterSync();
+    const now = new Date().toISOString();
 
-  // Web Sync
-  for (const item of formattedItems) {
-    await addOrUpdateProductMasterItem(item);
+    formattedItems.forEach((item) => {
+      const existingIndex = current.findIndex(
+        (p) => p.productName.toLowerCase() === item.productName.toLowerCase() ||
+               (item.barcodeNumber && p.barcodeNumber === item.barcodeNumber)
+      );
+
+      if (existingIndex >= 0) {
+        current[existingIndex] = {
+          ...current[existingIndex],
+          ...item,
+          updatedAt: now
+        };
+      } else {
+        current.push({
+          ...item,
+          id: String(Date.now() + Math.random()),
+          createdAt: now,
+          updatedAt: now
+        });
+      }
+    });
+
+    saveProductMasterSync(current);
   }
 
   return await getProductMasterAsync();

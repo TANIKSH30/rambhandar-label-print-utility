@@ -40,6 +40,27 @@ export const ALIAS_MAP: Record<keyof ColumnMapping, string[]> = {
 };
 
 /**
+ * Safely convert any cell value into a clean, trimmed string.
+ * Prevents undefined/null/[object Object] stringification errors.
+ */
+export const safeString = (val: any): string => {
+  if (val === null || val === undefined) return '';
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '';
+    const day = String(val.getDate()).padStart(2, '0');
+    const month = String(val.getMonth() + 1).padStart(2, '0');
+    const year = val.getFullYear();
+    return `${day} - ${month} - ${year}`;
+  }
+  if (typeof val === 'object') {
+    return '';
+  }
+  const str = String(val).trim();
+  if (str === 'undefined' || str === 'null' || str === 'NaN') return '';
+  return str;
+};
+
+/**
  * Format date as "DD - MM - YYYY"
  */
 export const getTodayFormattedDate = (): string => {
@@ -63,6 +84,52 @@ export const calculateBestBeforeDateOffset = (days: number = 60): string => {
 };
 
 /**
+ * Safely parse date input into standardized "DD - MM - YYYY" string format
+ */
+export const formatDateString = (dateInput: any): string => {
+  if (!dateInput) return getTodayFormattedDate();
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput.getTime())) return getTodayFormattedDate();
+    const day = String(dateInput.getDate()).padStart(2, '0');
+    const month = String(dateInput.getMonth() + 1).padStart(2, '0');
+    const year = dateInput.getFullYear();
+    return `${day} - ${month} - ${year}`;
+  }
+
+  const str = safeString(dateInput);
+  if (!str) return getTodayFormattedDate();
+
+  // If already formatted like DD - MM - YYYY
+  if (/^\d{2}\s*-\s*\d{2}\s*-\s*\d{4}$/.test(str)) {
+    return str.replace(/\s+/g, ' ');
+  }
+
+  // Handle DD-MM-YYYY or DD/MM/YYYY or YYYY-MM-DD
+  const parts = str.split(/[-/.\s]+/);
+  if (parts.length === 3) {
+    let day = parts[0];
+    let month = parts[1];
+    let year = parts[2];
+
+    if (day.length === 4) {
+      const temp = day;
+      day = year;
+      year = temp;
+    }
+
+    if (day.length === 1) day = '0' + day;
+    if (month.length === 1) month = '0' + month;
+    if (year.length === 2) year = '20' + year;
+
+    if (!isNaN(Number(day)) && !isNaN(Number(month)) && !isNaN(Number(year))) {
+      return `${day} - ${month} - ${year}`;
+    }
+  }
+
+  return str;
+};
+
+/**
  * Detect column header matches automatically using aliases
  */
 export const autoDetectColumnMapping = (headers: string[]): ColumnMapping => {
@@ -77,8 +144,10 @@ export const autoDetectColumnMapping = (headers: string[]): ColumnMapping => {
     copies: ''
   };
 
-  headers.forEach((h) => {
-    const cleanH = h.trim().toLowerCase();
+  const safeHeaders = Array.isArray(headers) ? headers.map(safeString).filter(Boolean) : [];
+
+  safeHeaders.forEach((h) => {
+    const cleanH = h.toLowerCase();
 
     (Object.keys(ALIAS_MAP) as Array<keyof ColumnMapping>).forEach((field) => {
       if (!mapping[field]) {
@@ -90,11 +159,11 @@ export const autoDetectColumnMapping = (headers: string[]): ColumnMapping => {
   });
 
   // Fallbacks if exact aliases weren't matched
-  if (!mapping.productName && headers.length > 0) mapping.productName = headers[0];
-  if (!mapping.netWeight && headers.length > 1) mapping.netWeight = headers[1];
-  if (!mapping.mrp && headers.length > 2) mapping.mrp = headers[2];
-  if (!mapping.batchNumber && headers.length > 3) mapping.batchNumber = headers[3];
-  if (!mapping.barcodeNumber && headers.length > 4) mapping.barcodeNumber = headers[4];
+  if (!mapping.productName && safeHeaders.length > 0) mapping.productName = safeHeaders[0];
+  if (!mapping.netWeight && safeHeaders.length > 1) mapping.netWeight = safeHeaders[1];
+  if (!mapping.mrp && safeHeaders.length > 2) mapping.mrp = safeHeaders[2];
+  if (!mapping.batchNumber && safeHeaders.length > 3) mapping.batchNumber = safeHeaders[3];
+  if (!mapping.barcodeNumber && safeHeaders.length > 4) mapping.barcodeNumber = safeHeaders[4];
 
   return mapping;
 };
@@ -102,55 +171,78 @@ export const autoDetectColumnMapping = (headers: string[]): ColumnMapping => {
 /**
  * Parse uploaded Excel or CSV file buffer/arrayBuffer into raw rows & column headers
  */
-export const parseRawExcelFile = (fileBuffer: ArrayBuffer | Uint8Array) => {
-  const workbook = XLSX.read(fileBuffer, { type: 'array', cellDates: true });
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
+export const parseRawExcelFile = (fileBuffer: ArrayBuffer | Uint8Array | null | undefined): { headers: string[]; rows: Record<string, any>[] } => {
+  try {
+    if (!fileBuffer || (fileBuffer instanceof ArrayBuffer && fileBuffer.byteLength === 0)) {
+      return { headers: [], rows: [] };
+    }
 
-  const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
-  if (!rawRows || rawRows.length === 0) {
+    const workbook = XLSX.read(fileBuffer, { type: 'array', cellDates: false, raw: false });
+    if (!workbook || !workbook.SheetNames || !Array.isArray(workbook.SheetNames) || workbook.SheetNames.length === 0) {
+      return { headers: [], rows: [] };
+    }
+
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet) {
+      return { headers: [], rows: [] };
+    }
+
+    const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '', raw: false });
+    if (!rawRows || !Array.isArray(rawRows) || rawRows.length === 0) {
+      return { headers: [], rows: [] };
+    }
+
+    // Extract headers safely and exclude empty key names
+    const headers = Object.keys(rawRows[0] || {})
+      .map(safeString)
+      .filter(Boolean);
+
+    return { headers, rows: rawRows };
+  } catch (err) {
+    console.error('Exception inside parseRawExcelFile:', err);
     return { headers: [], rows: [] };
   }
-
-  const headers = Object.keys(rawRows[0] || {});
-  return { headers, rows: rawRows };
 };
 
 /**
  * Process raw JSON rows using mapped column headers into validated BulkImportRow objects
  */
 export const processImportRows = (
-  rawRows: Record<string, any>[],
+  rawRows: Record<string, any>[] | null | undefined,
   mapping: ColumnMapping,
   existingHistory: PrintHistoryRecord[] = []
 ): BulkImportRow[] => {
-  const historyBarcodes = new Set(existingHistory.map((h) => String(h.barcodeNumber || '').trim()));
+  if (!rawRows || !Array.isArray(rawRows)) return [];
+
+  const historyBarcodes = new Set(
+    (existingHistory || [])
+      .map((h) => safeString(h?.barcodeNumber))
+      .filter(Boolean)
+  );
   const seenBarcodesInFile = new Set<string>();
 
   const processedRows: BulkImportRow[] = [];
 
   rawRows.forEach((row, idx) => {
-    const productName = String(row[mapping.productName] || '').trim();
-    const netWeight = String(row[mapping.netWeight] || '').trim() || '250GM';
-    const mrp = String(row[mapping.mrp] || '').trim() || '100/-';
-    const batchNumber = String(row[mapping.batchNumber] || '').trim();
-    const barcodeNumber = String(row[mapping.barcodeNumber] || '').trim();
-    let packedDate = String(row[mapping.packedDate] || '').trim();
-    let bestBefore = String(row[mapping.bestBefore] || '').trim();
-    const rawCopies = parseInt(String(row[mapping.copies] || '1'), 10);
-    const copies = isNaN(rawCopies) || rawCopies < 1 ? 1 : Math.min(999, rawCopies);
+    if (!row || typeof row !== 'object') return;
+
+    const productName = safeString(row[mapping?.productName]);
+    const netWeight = safeString(row[mapping?.netWeight]) || '250GM';
+    const mrp = safeString(row[mapping?.mrp]) || '100/-';
+    const batchNumber = safeString(row[mapping?.batchNumber]);
+    const barcodeNumber = safeString(row[mapping?.barcodeNumber]);
+    
+    let packedDate = formatDateString(row[mapping?.packedDate]) || getTodayFormattedDate();
+    let bestBefore = formatDateString(row[mapping?.bestBefore]) || calculateBestBeforeDateOffset(60);
+
+    const rawCopiesVal = row[mapping?.copies];
+    const parsedCopies = parseInt(String(rawCopiesVal || '1'), 10);
+    const copies = isNaN(parsedCopies) || parsedCopies < 1 ? 1 : Math.min(999, parsedCopies);
 
     // Skip completely empty rows
     if (!productName && !batchNumber && !barcodeNumber) {
       return;
-    }
-
-    // Auto-fill dates if missing
-    if (!packedDate) {
-      packedDate = getTodayFormattedDate();
-    }
-    if (!bestBefore) {
-      bestBefore = calculateBestBeforeDateOffset(60);
     }
 
     let isValid = true;
@@ -167,6 +259,9 @@ export const processImportRows = (
     if (!barcodeNumber) {
       isValid = false;
       errors.push('Barcode Number is required');
+    } else if (!/^[A-Za-z0-9\-_]+$/.test(barcodeNumber)) {
+      isValid = false;
+      errors.push('Invalid Barcode format');
     }
 
     let isDuplicateInFile = false;
@@ -243,7 +338,6 @@ export const generateMatadinTemplateWorkbook = (): ArrayBuffer => {
 
   const worksheet = XLSX.utils.json_to_sheet(sampleData);
   
-  // Set column widths
   worksheet['!cols'] = [
     { wch: 24 }, // Product Name
     { wch: 12 }, // Net Weight

@@ -284,30 +284,52 @@ export const App: React.FC = () => {
 
   // Helper to parse file arrayBuffer into state
   const loadExcelArrayBuffer = async (arrayBuffer: ArrayBuffer) => {
-    let history: PrintHistoryRecord[] = [];
-    if (window.electronAPI?.getPrintHistory) {
+    try {
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        alert('The selected Excel file is empty or corrupted.');
+        return;
+      }
+
+      let history: PrintHistoryRecord[] = [];
+      if (window.electronAPI?.getPrintHistory) {
+        try {
+          history = await window.electronAPI.getPrintHistory({ limit: 500 });
+        } catch (hErr) {
+          console.warn('Could not fetch print history for Excel duplicate check:', hErr);
+        }
+      }
+
+      const { headers, rows } = parseRawExcelFile(arrayBuffer);
+      if (!rows || !Array.isArray(rows) || rows.length === 0) {
+        alert('The uploaded Excel file contains no valid data rows or could not be parsed.');
+        return;
+      }
+
+      const detectedMapping = autoDetectColumnMapping(headers || []);
+      const processed = processImportRows(rows, detectedMapping, history);
+
+      if (!processed || !Array.isArray(processed) || processed.length === 0) {
+        alert('No valid product rows were found in the Excel file.');
+        return;
+      }
+
+      // Sync imported Excel rows to Product Master (SQLite / Web)
       try {
-        history = await window.electronAPI.getPrintHistory({ limit: 500 });
-      } catch (_) {}
+        await syncExcelRowsToProductMaster(processed);
+      } catch (pmErr) {
+        console.warn('Product Master sync warning during Excel import:', pmErr);
+      }
+
+      // Guarantee state is never updated with null/undefined data
+      setBulkHeaders(Array.isArray(headers) ? headers : []);
+      setBulkRawRows(Array.isArray(rows) ? rows : []);
+      setBulkMapping(detectedMapping);
+      setBulkRows(processed);
+      setIsBulkImportOpen(true);
+    } catch (error: any) {
+      console.error('Fatal Excel Import Exception:', error);
+      alert(`Excel Import Error: ${error?.message || 'Could not parse Excel file. Please check file format.'}`);
     }
-
-    const { headers, rows } = parseRawExcelFile(arrayBuffer);
-    if (!rows || rows.length === 0) {
-      alert('Selected file contains no data or could not be parsed.');
-      return;
-    }
-
-    const detectedMapping = autoDetectColumnMapping(headers);
-    const processed = processImportRows(rows, detectedMapping, history);
-
-    // Sync imported Excel rows to Product Master (SQLite / Web)
-    await syncExcelRowsToProductMaster(processed);
-
-    setBulkHeaders(headers);
-    setBulkRawRows(rows);
-    setBulkMapping(detectedMapping);
-    setBulkRows(processed);
-    setIsBulkImportOpen(true);
   };
 
   const handleOpenImportExcel = async () => {
