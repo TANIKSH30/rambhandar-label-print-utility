@@ -12,5 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   printLabel: (request: any) => ipcRenderer.invoke('print-label', request),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settingsMap: Record<string, string>) => ipcRenderer.invoke('save-settings', settingsMap),
-  openExcelFile: () => ipcRenderer.invoke('open-excel-file')
+  openExcelFile: () => ipcRenderer.invoke('open-excel-file'),
+  getProductMaster: (search?: string) => ipcRenderer.invoke('get-product-master', search),
+  saveProductMaster: (item: any) => ipcRenderer.invoke('save-product-master', item),
+  syncProductMaster: (items: any[]) => ipcRenderer.invoke('sync-product-master', items)
 });

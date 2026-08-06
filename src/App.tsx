@@ -26,6 +26,12 @@ import {
   AppSettings,
   PrinterStatusType
 } from './types/label';
+import {
+  syncExcelRowsToProductMaster,
+  addOrUpdateProductMasterItem,
+  getProductMasterAsync,
+  ProductMasterItem
+} from './utils/productMaster';
 
 const getTodayDateStr = () => {
   const d = new Date();
@@ -251,6 +257,19 @@ export const App: React.FC = () => {
         window.print();
         setPrintStatus({ type: 'success', message: 'Using Windows Print Dialog' });
       }
+
+      if (labelData.productName && labelData.productName.trim()) {
+        getProductMasterAsync(labelData.productName).then((res: ProductMasterItem[]) => {
+          const isKnown = res.some(
+            (p: ProductMasterItem) => p.productName.toLowerCase() === labelData.productName.trim().toLowerCase()
+          );
+          if (!isKnown) {
+            if (window.confirm(`Save "${labelData.productName}" to Product Master?`)) {
+              addOrUpdateProductMasterItem(labelData);
+            }
+          }
+        });
+      }
     } catch (error: any) {
       clearInterval(progressInterval);
       setPrintStatus({ type: 'error', message: error?.message || 'Printer error occurred.' });
@@ -280,6 +299,9 @@ export const App: React.FC = () => {
 
     const detectedMapping = autoDetectColumnMapping(headers);
     const processed = processImportRows(rows, detectedMapping, history);
+
+    // Sync imported Excel rows to Product Master (SQLite / Web)
+    await syncExcelRowsToProductMaster(processed);
 
     setBulkHeaders(headers);
     setBulkRawRows(rows);

@@ -10,7 +10,10 @@ import {
   deleteTemplate,
   getSettings,
   saveSettings,
-  exportPrintLogsCSV
+  exportPrintLogsCSV,
+  getProductMasterFromDB,
+  saveProductMasterToDB,
+  syncExcelToProductMasterDB
 } from './database';
 
 app.commandLine.appendSwitch('enable-print-preview');
@@ -130,6 +133,21 @@ ipcMain.handle('get-settings', async () => {
 // IPC Handler: Save App Settings
 ipcMain.handle('save-settings', async (_, settingsMap) => {
   return await saveSettings(settingsMap);
+});
+
+// IPC Handler: Fetch Product Master from SQLite
+ipcMain.handle('get-product-master', async (_, search?: string) => {
+  return await getProductMasterFromDB(search);
+});
+
+// IPC Handler: Save / Update Product Master Item in SQLite
+ipcMain.handle('save-product-master', async (_, item) => {
+  return await saveProductMasterToDB(item);
+});
+
+// IPC Handler: Sync Excel Rows to Product Master in SQLite
+ipcMain.handle('sync-product-master', async (_, items) => {
+  return await syncExcelToProductMasterDB(items);
 });
 
 // IPC Handler: Export Print Log CSV Report with Save File Dialog

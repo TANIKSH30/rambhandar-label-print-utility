@@ -116,6 +116,22 @@ export async function initDatabase(): Promise<Database | null> {
       );
     `);
 
+    // 4. Table: product_master
+    dbInstance.run(`
+      CREATE TABLE IF NOT EXISTS product_master (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_name TEXT UNIQUE NOT NULL,
+        net_weight TEXT,
+        mrp TEXT,
+        barcode_number TEXT,
+        default_batch_number TEXT,
+        default_best_before TEXT,
+        created_at TEXT,
+        updated_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_pm_name ON product_master(product_name);
+    `);
+
     // Insert default preset templates if products table is empty
     const countRes = dbInstance.exec('SELECT COUNT(*) as count FROM products;');
     const count = countRes[0]?.values[0]?.[0] as number || 0;
@@ -422,5 +438,109 @@ export async function exportPrintLogsCSV(
   } catch (err) {
     console.error('Failed to export CSV report:', err);
     return '';
+  }
+}
+
+export interface ProductMasterDBRecord {
+  id?: number;
+  productName: string;
+  netWeight: string;
+  mrp: string;
+  barcodeNumber: string;
+  defaultBatchNumber?: string;
+  defaultBestBefore?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function getProductMasterFromDB(search?: string): Promise<ProductMasterDBRecord[]> {
+  try {
+    await initDatabase();
+    if (!dbInstance) return [];
+
+    let query = 'SELECT * FROM product_master';
+    if (search && search.trim()) {
+      const sanitized = search.trim().replace(/'/g, "''");
+      query += ` WHERE product_name LIKE '%${sanitized}%' OR barcode_number LIKE '%${sanitized}%'`;
+    }
+    query += ' ORDER BY product_name ASC LIMIT 1000;';
+
+    const res = dbInstance.exec(query);
+    if (res.length === 0) return [];
+
+    const columns = res[0].columns;
+    const values = res[0].values;
+
+    const nameIdx = columns.indexOf('product_name');
+    const weightIdx = columns.indexOf('net_weight');
+    const mrpIdx = columns.indexOf('mrp');
+    const barcodeIdx = columns.indexOf('barcode_number');
+    const batchIdx = columns.indexOf('default_batch_number');
+    const bestIdx = columns.indexOf('default_best_before');
+    const idIdx = columns.indexOf('id');
+
+    return values.map((row) => ({
+      id: row[idIdx] as number,
+      productName: row[nameIdx] as string,
+      netWeight: (row[weightIdx] as string) || '',
+      mrp: (row[mrpIdx] as string) || '',
+      barcodeNumber: (row[barcodeIdx] as string) || '',
+      defaultBatchNumber: (row[batchIdx] as string) || '',
+      defaultBestBefore: (row[bestIdx] as string) || ''
+    }));
+  } catch (err) {
+    console.error('Failed to get Product Master from SQLite:', err);
+    return [];
+  }
+}
+
+export async function saveProductMasterToDB(item: ProductMasterDBRecord): Promise<boolean> {
+  try {
+    await initDatabase();
+    if (!dbInstance || !item.productName || !item.productName.trim()) return false;
+
+    const now = new Date().toISOString();
+    const name = item.productName.trim().replace(/'/g, "''");
+    const weight = (item.netWeight || '').replace(/'/g, "''");
+    const mrp = (item.mrp || '').replace(/'/g, "''");
+    const barcode = (item.barcodeNumber || '').replace(/'/g, "''");
+    const batch = (item.defaultBatchNumber || '').replace(/'/g, "''");
+    const best = (item.defaultBestBefore || '').replace(/'/g, "''");
+
+    const query = `
+      INSERT INTO product_master (product_name, net_weight, mrp, barcode_number, default_batch_number, default_best_before, created_at, updated_at)
+      VALUES ('${name}', '${weight}', '${mrp}', '${barcode}', '${batch}', '${best}', '${now}', '${now}')
+      ON CONFLICT(product_name) DO UPDATE SET
+        net_weight = excluded.net_weight,
+        mrp = excluded.mrp,
+        barcode_number = excluded.barcode_number,
+        default_batch_number = excluded.default_batch_number,
+        default_best_before = excluded.default_best_before,
+        updated_at = excluded.updated_at;
+    `;
+
+    dbInstance.run(query);
+    persistDatabase();
+    return true;
+  } catch (err) {
+    console.error('Failed to save Product Master item to SQLite:', err);
+    return false;
+  }
+}
+
+export async function syncExcelToProductMasterDB(items: ProductMasterDBRecord[]): Promise<boolean> {
+  try {
+    await initDatabase();
+    if (!dbInstance || !items || items.length === 0) return false;
+
+    for (const item of items) {
+      if (item.productName && item.productName.trim()) {
+        await saveProductMasterToDB(item);
+      }
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to sync Excel items to SQLite product master:', err);
+    return false;
   }
 }

@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { LabelData, ProductTemplate } from '../types/label';
-import { Tag, Weight, IndianRupee, Hash, Barcode, Calendar, Clock, Sparkles, LayoutGrid, Plus } from 'lucide-react';
+import { Tag, Weight, IndianRupee, Hash, Barcode, Calendar, Clock, Sparkles, LayoutGrid, Plus, Check } from 'lucide-react';
+import {
+  getProductMasterAsync,
+  searchProductMasterAsync,
+  addOrUpdateProductMasterItem,
+  ProductMasterItem
+} from '../utils/productMaster';
 
 interface LabelDetailsFormProps {
   labelData: LabelData;
@@ -26,8 +32,63 @@ export const LabelDetailsForm: React.FC<LabelDetailsFormProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [selectedExpiryPreset, setSelectedExpiryPreset] = useState<string>('60 Days');
 
+  // Autocomplete Product Master State
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+  const [suggestions, setSuggestions] = useState<ProductMasterItem[]>([]);
+  const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+  const [isExistingInMaster, setIsExistingInMaster] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    searchProductMasterAsync(labelData.productName).then((res) => {
+      if (isMounted) {
+        setSuggestions(res);
+        const exists = res.some(
+          (p) => p.productName.toLowerCase() === labelData.productName.trim().toLowerCase()
+        );
+        setIsExistingInMaster(exists);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [labelData.productName]);
+
   const handleInputChange = (field: keyof LabelData, value: string) => {
     onChange({ [field]: value });
+  };
+
+  const handleProductNameChange = (value: string) => {
+    onChange({ productName: value });
+    setShowSuggestions(true);
+    searchProductMasterAsync(value).then((res) => setSuggestions(res));
+  };
+
+  const handleSelectProductMasterItem = (item: ProductMasterItem) => {
+    setShowSuggestions(false);
+    onChange({
+      productName: item.productName,
+      netWeight: item.netWeight || labelData.netWeight,
+      mrp: item.mrp || labelData.mrp,
+      barcodeNumber: item.barcodeNumber || labelData.barcodeNumber,
+      batchNumber: item.defaultBatchNumber || labelData.batchNumber,
+      bestBefore: item.defaultBestBefore || labelData.bestBefore
+    });
+  };
+
+  const handleSaveCurrentToMaster = async () => {
+    if (!labelData.productName || !labelData.productName.trim()) return;
+    await addOrUpdateProductMasterItem({
+      productName: labelData.productName,
+      netWeight: labelData.netWeight,
+      mrp: labelData.mrp,
+      barcodeNumber: labelData.barcodeNumber,
+      defaultBatchNumber: labelData.batchNumber,
+      defaultBestBefore: labelData.bestBefore
+    });
+    setSavedSuccess(true);
+    setIsExistingInMaster(true);
+    setTimeout(() => setSavedSuccess(false), 2000);
   };
 
   // Helper to format today's date: e.g. "05 - 08 - 2026"
@@ -130,18 +191,62 @@ export const LabelDetailsForm: React.FC<LabelDetailsFormProps> = ({
         {/* 2-Column Desktop Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
-          {/* Product Name (Span 2) */}
-          <div className="md:col-span-2 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 text-[#0B1B3A]" /> Product Name
-            </label>
+          {/* Product Name Autocomplete Combobox (Span 2) */}
+          <div className="md:col-span-2 space-y-1.5 relative">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-[#0B1B3A]" /> Product Name
+              </label>
+
+              {savedSuccess ? (
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Check className="w-3 h-3 text-emerald-600" /> Saved to Master
+                </span>
+              ) : !isExistingInMaster && labelData.productName.trim() ? (
+                <button
+                  type="button"
+                  onClick={handleSaveCurrentToMaster}
+                  className="text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1 transition shadow-xs"
+                >
+                  <Plus className="w-3 h-3 text-amber-600" /> Save to Master
+                </button>
+              ) : null}
+            </div>
+
             <input
               type="text"
               value={labelData.productName}
-              onChange={(e) => handleInputChange('productName', e.target.value)}
-              placeholder="e.g. Desi Ghee Soan Papdi"
+              onChange={(e) => handleProductNameChange(e.target.value)}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              placeholder="Type product name (e.g. Falhari Chiwda)..."
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#0B1B3A]/20 focus:border-[#0B1B3A] transition"
             />
+
+            {/* Live Autocomplete Suggestions Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-auto py-1">
+                {suggestions.map((item) => (
+                  <button
+                    key={(item.id || '') + item.productName}
+                    type="button"
+                    onMouseDown={() => handleSelectProductMasterItem(item)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b border-slate-100 last:border-0 flex items-center justify-between text-xs transition"
+                  >
+                    <div>
+                      <div className="font-bold text-[#0B1B3A] text-sm">{item.productName}</div>
+                      <div className="text-slate-500 text-[11px]">
+                        Weight: {item.netWeight} | MRP: ₹{item.mrp}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono text-xs font-bold text-slate-700">#{item.barcodeNumber}</div>
+                      <div className="text-[10px] text-amber-600 font-semibold">Click to Auto-fill</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Net Weight */}
